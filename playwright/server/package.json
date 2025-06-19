@@ -1,0 +1,13 @@
+{
+  "name": "playwright-server",
+  "version": "1.0.3",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "description": "Playwright persistent context server",
+  "dependencies": {
+    "playwright": "^1.52.0"
+  }
+}
