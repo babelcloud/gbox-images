@@ -60,7 +60,7 @@ jobs:
           echo "Using config: $CONFIG"
 
           # Convert the object {module:tag} -> [{"module":"...","tag":"..."}, ...]
-          MATRIX=$(echo "$CONFIG" | jq -c '[to_entries[] | {module: .key, tag: .value}]')
+          MATRIX=$(echo "$CONFIG" | jq -c '{include: [to_entries[] | {module: .key, tag: .value}] }')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
   build:
