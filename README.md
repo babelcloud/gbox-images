@@ -2,7 +2,7 @@
 
 [![Build Gbox Images](https://github.com/babelcloud/gbox-images/actions/workflows/build-images.yaml/badge.svg)](https://github.com/babelcloud/gbox-images/actions/workflows/build-images.yaml)
 
-> Multi-arch container images that power the <a href="https://gbox.ai" target="_blank">Gbox</a> sandbox.
+> Multi-arch container images that power the [Gbox](https://gbox.ai) sandbox.
 
 ---
 
