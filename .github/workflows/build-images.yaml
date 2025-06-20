@@ -4,18 +4,26 @@ on:
   # 1. Manual trigger, allowing users to select modules & tags
   workflow_dispatch:
     inputs:
-      build_config:
-        description: >-
-          JSON object mapping module name to tag, e.g.
-          {"base":"v1.0.0","playwright":"v2.0.0"}. Tag can be empty -> auto SHA.
-        required: true
-        default: '{"base":"","playwright":""}'
-      push:
-        description: >-
-          Push images to registry after build (default false). Set to true to publish.
+      tag:
+        description: "Image tag (Default: Commit SHA)"
+        type: string
+        required: false
+        default: ""
+      base:
+        description: "Build module: base"
+        type: boolean
         required: false
         default: false
+      playwright:
+        description: "Build module: playwright"
         type: boolean
+        required: false
+        default: false
+      push:
+        description: "push to registry"
+        type: boolean
+        required: false
+        default: false
 
   # 2. Any push or PR should run the build (but may not push)
   push:
@@ -37,9 +45,9 @@ jobs:
         name: Check for jq
         run: |
           if command -v jq >/dev/null 2>&1; then
-            echo "has_jq=true" >> "$GITHUB_OUTPUT"
+            echo "has_jq=true" | tee -a "$GITHUB_OUTPUT"
           else
-            echo "has_jq=false" >> "$GITHUB_OUTPUT"
+            echo "has_jq=false" | tee -a "$GITHUB_OUTPUT"
           fi
 
       - name: Install jq
@@ -51,9 +59,24 @@ jobs:
         run: |
           # Detect configuration source
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            CONFIG='${{ github.event.inputs.build_config }}'
+            # Build config based on selected module booleans
+            CONFIG='{}'
+            TAG_INPUT='${{ github.event.inputs.tag }}'
+
+            if [[ "${{ github.event.inputs.base }}" == 'true' ]]; then
+              CONFIG=$(echo "$CONFIG" | jq --arg tag "$TAG_INPUT" '. + {base: $tag}')
+            fi
+            if [[ "${{ github.event.inputs.playwright }}" == 'true' ]]; then
+              CONFIG=$(echo "$CONFIG" | jq --arg tag "$TAG_INPUT" '. + {playwright: $tag}')
+            fi
+
+            # Fail if no module selected
+            if [[ "$CONFIG" == '{}' ]]; then
+              echo "❌ At least one module (base/playwright) must be selected." >&2
+              exit 1
+            fi
           else
-            # Discover every directory at repo root containing a Dockerfile
+            # Default: all known modules with empty tag => auto SHA later
             CONFIG=$(jq -n '{base:"",playwright:""}')
           fi
 
@@ -61,7 +84,7 @@ jobs:
 
           # Convert the object {module:tag} -> [{"module":"...","tag":"..."}, ...]
           MATRIX=$(echo "$CONFIG" | jq -c '{include: [to_entries[] | {module: .key, tag: .value}] }')
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "matrix=$MATRIX" | tee -a "$GITHUB_OUTPUT"
 
   build:
     needs: prepare
@@ -109,10 +132,10 @@ jobs:
               TAG="$(git rev-parse --short HEAD)"
             fi
           fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" | tee -a "$GITHUB_OUTPUT"
           # Flag whether to also apply the floating 'main' tag
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "is_main=true" >> "$GITHUB_OUTPUT"
+            echo "is_main=true" | tee -a "$GITHUB_OUTPUT"
           fi
 
       # Prepare tag list for build-push-action
@@ -124,7 +147,7 @@ jobs:
           if [[ "${{ steps.set-tag.outputs.is_main }}" == "true" && "${PUSH_IMAGE}" == "true" ]]; then
             TAGS="$TAGS,$IMAGE:main"
           fi
-          echo "list=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "list=$TAGS" | tee -a "$GITHUB_OUTPUT"
 
       # ---- Build & (optionally) Push using docker/build-push-action ------------------------
       - name: Build and push image
