@@ -29,12 +29,21 @@ jobs:
   # or default to all modules (CI builds)
   # ------------------------------------------------------------
   prepare:
-    runs-on:
-      labels: ubuntu-24.04-4core
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Install jq (for JSON processing)
+      - id: check-jq
+        name: Check for jq
+        run: |
+          if command -v jq >/dev/null 2>&1; then
+            echo "has_jq=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_jq=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install jq
+        if: steps.check-jq.outputs.has_jq == 'false'
         run: sudo apt-get update -y && sudo apt-get install -y jq
 
       - id: set-matrix
@@ -56,8 +65,7 @@ jobs:
 
   build:
     needs: prepare
-    runs-on:
-      labels: ubuntu-24.04-4core
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write # Required for ghcr.io
